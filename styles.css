@@ -32,7 +32,12 @@ body {
 /* ── Screens ─────────────────────────────────────────────────── */
 .screen { display: none; height: 100%; }
 .screen.active { display: flex; flex-direction: column; }
-#screenApp { height: 100vh; }
+/* 100vh is the *largest* possible viewport on mobile (address bar hidden);
+   with overflow:hidden on html/body there's no scroll to compensate, so
+   when the browser chrome is showing, content at the bottom (the nav bar)
+   ends up below the visible fold. 100dvh tracks the actual visible
+   viewport and updates live as the browser chrome shows/hides. */
+#screenApp { height: 100vh; height: 100dvh; }
 #screenApp.active { display: grid; grid-template-rows: 1fr auto; }
 
 /* ── Auth screen ─────────────────────────────────────────────── */
@@ -49,6 +54,26 @@ body {
 .auth-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 12px; }
 .auth-err { color: var(--red); font-size: 13px; text-align: center; }
 .auth-hint { text-align: center; }
+.beta-banner {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text);
+}
+.beta-banner-link {
+  background: none;
+  border: none;
+  color: var(--accent2);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  margin-left: 2px;
+}
 
 /* ── Views ───────────────────────────────────────────────────── */
 .view { display: none; height: 100%; }
