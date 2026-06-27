@@ -1,0 +1,12 @@
+-- DEPRECATED — do not run this file.
+--
+-- This was an earlier draft of the sponsorship migration and diverged from
+-- server/sponsorship-migration.sql (different charities columns, an unused
+-- 'accepted' status value, etc.). The two were never meant to both exist;
+-- server/sponsorship-migration.sql is now the single source of truth and is
+-- what DEPLOYMENT.md references.
+--
+-- If you already ran THIS file against a live D1 database, do not also run
+-- sponsorship-migration.sql verbatim — its `ALTER TABLE user_stats ADD COLUMN
+-- lifetime_steps` and `CREATE TABLE` statements will conflict with what's
+-- already there. Diff the two files and apply only what's missing.
