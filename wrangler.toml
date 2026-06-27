@@ -1,0 +1,30 @@
+name = "gps-challenge-worker"
+main = "server/worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gps-challenge-db"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+[vars]
+ALLOWED_ORIGINS = "https://YOUR_USERNAME.github.io,http://localhost:5500,http://127.0.0.1:5500"
+DEV_MODE = "false"
+JWT_ISSUER = "https://YOUR_TENANT.ciamlogin.com/YOUR_TENANT_ID/v2.0"
+JWKS_URI = "https://YOUR_TENANT.ciamlogin.com/YOUR_TENANT_ID/discovery/v2.0/keys"
+
+# Sweeps overdue sponsored challenges (refund/charity-donate) every 15 minutes.
+# Without this, a challenge whose walker never logs another activity after the
+# deadline passes would stay "active" forever.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Store secrets via: wrangler secret put SECRET_NAME
+# Required secrets (not set here):
+# MSAL_CLIENT_ID  - Entra External ID app client ID (used client-side but good to track)
+# ADMIN_SECRET    - bearer value for POST /admin/process-expired (manual/backup sweep trigger)

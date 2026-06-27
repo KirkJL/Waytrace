@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0f14">
+<title>WayTrace – GPS Challenge</title>
+
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org blob:; connect-src 'self' https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://login.microsoftonline.com https://*.ciamlogin.com https://*.workers.dev https://graph.microsoft.com https://unpkg.com; worker-src 'self' blob:; font-src 'self' https://unpkg.com data:; object-src 'none';">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link href="./styles.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- ── Sign-in screen ──────────────────────────────────────────── -->
+<div id="screenAuth" class="screen active">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="28" fill="#2b6cff"/>
+        <path d="M28 14 L34 26 L42 22 L30 44 L24 32 L16 36 Z" fill="white" opacity="0.9"/>
+      </svg>
+      <h1>WayTrace</h1>
+      <p class="auth-tagline">Track. Compete. Level Up.</p>
+    </div>
+    <div class="auth-card">
+      <button id="btnSignIn" class="btn-primary btn-xl">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 0C4.477 0 0 4.477 0 10s4.477 10 10 10 10-4.477 10-10S15.523 0 10 0zm0 1.5a8.5 8.5 0 110 17 8.5 8.5 0 010-17z"/></svg>
+        Sign in with Microsoft
+      </button>
+      <p id="authError" class="auth-err" hidden></p>
+      <p class="auth-hint small muted">Free account · No payment required</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main app ─────────────────────────────────────────────────── -->
+<div id="screenApp" class="screen" hidden>
+
+  <nav id="bottomNav">
+    <button class="nav-btn active" data-view="track">
+      <span class="nav-icon">📍</span><span class="nav-label">Track</span>
+    </button>
+    <button class="nav-btn" data-view="stats">
+      <span class="nav-icon">📊</span><span class="nav-label">Stats</span>
+    </button>
+    <button class="nav-btn" data-view="social">
+      <span class="nav-icon">👥</span><span class="nav-label">Social</span>
+    </button>
+    <button class="nav-btn" data-view="leaderboard">
+      <span class="nav-icon">🏆</span><span class="nav-label">Ranks</span>
+    </button>
+    <button class="nav-btn" data-view="sponsor">
+      <span class="nav-icon">💰</span><span class="nav-label">Sponsor</span>
+      <span id="notifBadge" class="notif-badge" hidden>0</span>
+    </button>
+    <button class="nav-btn" data-view="profile">
+      <span class="nav-icon">👤</span><span class="nav-label">Me</span>
+    </button>
+  </nav>
+
+  <!-- VIEW: Track -->
+  <div id="viewTrack" class="view active">
+    <div id="map"></div>
+    <div id="trackHud" class="track-hud">
+      <div class="hud-header">
+        <div>
+          <div id="hudTitle" class="hud-title">Ready to Go</div>
+          <div id="hudSub" class="hud-sub muted small">GPS initialising…</div>
+        </div>
+        <div class="hud-badges">
+          <span id="wakeLockBadge" class="badge badge-dim" title="Screen wake lock">🔆</span>
+          <span id="gpsBadge" class="badge badge-dim" title="GPS accuracy">📡</span>
+          <span id="syncBadge" class="badge badge-dim" title="Sync">☁️</span>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric"><div id="metricDist" class="metric-val">0.00</div><div class="metric-label">km</div></div>
+        <div class="metric"><div id="metricTime" class="metric-val">0:00</div><div class="metric-label">time</div></div>
+        <div class="metric"><div id="metricPace" class="metric-val">--:--</div><div class="metric-label">min/km</div></div>
+        <div class="metric"><div id="metricCal" class="metric-val">0</div><div class="metric-label">kcal</div></div>
+      </div>
+      <div class="track-controls">
+        <div class="control-row">
+          <select id="actType" class="type-select">
+            <option value="walk">🚶 Walk</option>
+            <option value="run">🏃 Run</option>
+          </select>
+          <label class="acc-toggle small"><input type="checkbox" id="hiAcc" checked> High Acc</label>
+        </div>
+        <div class="control-row">
+          <button id="btnStart" class="btn-primary btn-xl btn-track" disabled>Start</button>
+          <button id="btnPause" class="btn-secondary btn-xl btn-track" disabled hidden>Pause</button>
+          <button id="btnResume" class="btn-secondary btn-xl btn-track" disabled hidden>Resume</button>
+          <button id="btnFinish" class="btn-danger btn-xl btn-track" disabled hidden>Finish</button>
+        </div>
+        <div class="control-row" id="mapControls">
+          <button id="btnCenter" class="btn-secondary btn-sm">Center</button>
+          <button id="btnExportGpx" class="btn-secondary btn-sm" disabled>Export GPX</button>
+        </div>
+      </div>
+      <div id="challengeStrip" class="challenge-strip" hidden></div>
+    </div>
+  </div>
+
+  <!-- VIEW: Stats -->
+  <div id="viewStats" class="view" hidden>
+    <div class="view-scroll">
+      <div class="view-header"><h2>My Statistics</h2></div>
+      <div id="levelBanner" class="level-banner">
+        <div class="level-num">Lvl <span id="statLevel">1</span></div>
+        <div class="level-xp-wrap">
+          <div class="level-label"><span id="statXp">0</span> XP</div>
+          <div class="xp-bar"><div id="xpBarFill" class="xp-fill"></div></div>
+          <div class="level-next small muted"><span id="xpToNext">250</span> XP to next level</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="statsGrid"></div>
+      <h3 class="section-head">Personal Bests</h3>
+      <div class="pb-list" id="pbList"></div>
+      <h3 class="section-head">Achievements</h3>
+      <div class="ach-grid" id="achGrid"></div>
+      <h3 class="section-head">Recent Activities</h3>
+      <div id="actList" class="act-list"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: Social -->
+  <div id="viewSocial" class="view" hidden>
+    <div class="view-scroll">
+      <div class="view-header"><h2>Social</h2></div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="friends">Friends</button>
+        <button class="tab-btn" data-tab="clubs">Clubs</button>
+        <button class="tab-btn" data-tab="challenges">Challenges</button>
+      </div>
+      <div id="tabFriends" class="tab-content">
+        <div class="search-row">
+          <input id="friendSearch" placeholder="Search by name or email…" class="input-field">
+          <button id="btnFriendSearch" class="btn-secondary btn-sm">Search</button>
+        </div>
+        <div id="friendSearchResults" class="search-results"></div>
+        <h4 class="section-sub">Pending Requests</h4>
+        <div id="pendingRequests" class="friend-list"></div>
+        <h4 class="section-sub">Friends</h4>
+        <div id="friendList" class="friend-list"></div>
+      </div>
+      <div id="tabClubs" class="tab-content" hidden>
+        <div class="club-actions">
+          <button id="btnCreateClub" class="btn-primary btn-sm">+ Create Club</button>
+          <button id="btnJoinClub" class="btn-secondary btn-sm">Join by Code</button>
+        </div>
+        <div id="clubList" class="club-list"></div>
+      </div>
+      <div id="tabChallenges" class="tab-content" hidden>
+        <div class="challenge-date small muted">Today's Challenges</div>
+        <div id="challengeList" class="challenge-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: Leaderboard -->
+  <div id="viewLeaderboard" class="view" hidden>
+    <div class="view-scroll">
+      <div class="view-header"><h2>Leaderboards</h2></div>
+      <div class="lb-filters">
+        <div class="filter-group">
+          <label class="small muted">Period</label>
+          <div class="pill-bar" id="lbPeriod">
+            <button class="pill" data-val="daily">Day</button>
+            <button class="pill active" data-val="weekly">Week</button>
+            <button class="pill" data-val="monthly">Month</button>
+            <button class="pill" data-val="lifetime">All</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <label class="small muted">Category</label>
+          <div class="pill-bar" id="lbCategory">
+            <button class="pill active" data-val="distance">Distance</button>
+            <button class="pill" data-val="xp">XP</button>
+            <button class="pill" data-val="activities">Activities</button>
+            <button class="pill" data-val="duration">Duration</button>
+          </div>
+        </div>
+      </div>
+      <div id="lbList" class="lb-list"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: Profile -->
+  <div id="viewProfile" class="view" hidden>
+    <div class="view-scroll">
+      <div class="profile-hero">
+        <button id="profileAvatar" class="avatar-lg avatar-editable" title="Change photo">?</button>
+        <input id="avatarFileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        <div>
+          <div id="profileName" class="profile-name">Loading…</div>
+          <div id="profileJoin" class="small muted"></div>
+        </div>
+      </div>
+      <div class="profile-meta">
+        <div class="meta-chip">Level <span id="profileLevel">-</span></div>
+        <div class="meta-chip"><span id="profileStreak">-</span> day streak 🔥</div>
+      </div>
+      <button id="btnSignOut" class="btn-secondary btn-sm" style="margin:16px">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- VIEW: Sponsor (single, canonical view) -->
+  <div id="viewSponsor" class="view" hidden>
+    <div class="view-scroll">
+      <div class="view-header sponsor-header">
+        <h2>Step Challenges</h2>
+        <button id="btnNotifRead" class="btn-secondary btn-sm" hidden>Mark all read</button>
+      </div>
+
+      <div class="tab-bar" id="sponsorTabBar">
+        <button class="tab-btn active" data-stab="my-challenges">My Challenges</button>
+        <button class="tab-btn" data-stab="sponsor-someone">Sponsor</button>
+        <button class="tab-btn" data-stab="sp-leaderboard">Leaderboard</button>
+        <button class="tab-btn" data-stab="notifications">Alerts</button>
+      </div>
+
+      <!-- My Challenges -->
+      <div id="stabMyChallenges" class="tab-content">
+        <div id="walkerBanner" class="wallet-banner" hidden>
+          <div class="wallet-row">
+            <div class="wallet-item"><div id="wbPot" class="wallet-val text-green">£0.00</div><div class="wallet-lbl">Active Pot</div></div>
+            <div class="wallet-item"><div id="wbEarned" class="wallet-val text-gold">£0.00</div><div class="wallet-lbl">Lifetime Earned</div></div>
+            <div class="wallet-item"><div id="wbCharity" class="wallet-val" style="color:var(--accent2)">£0.00</div><div class="wallet-lbl">For Charity</div></div>
+          </div>
+          <div class="wallet-steps"><span id="wbSteps" class="wallet-steps-val">0</span><span class="small muted"> lifetime steps</span></div>
+        </div>
+        <div class="section-sub-row"><span class="section-sub">Active &amp; Pending</span></div>
+        <div id="activeChallengesList" class="sc-list"></div>
+        <div class="section-sub-row"><span class="section-sub">Completed</span></div>
+        <div id="completedChallengesList" class="sc-list"></div>
+        <div class="section-sub-row"><span class="section-sub">As Sponsor</span></div>
+        <div id="sponsoredByMeList" class="sc-list"></div>
+      </div>
+
+      <!-- Sponsor Someone -->
+      <div id="stabSponsorSomeone" class="tab-content" hidden>
+        <div class="sponsor-form">
+          <div class="form-group">
+            <label class="form-label">Walker to Sponsor</label>
+            <div class="search-row">
+              <input id="spWalkerSearch" class="input-field" placeholder="Search by name…">
+              <button id="btnSpWalkerSearch" class="btn-secondary btn-sm">Find</button>
+            </div>
+            <div id="spWalkerResults" class="search-results"></div>
+            <div id="spSelectedWalker" class="selected-walker" hidden></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Challenge Amount (£)</label>
+            <input id="spAmount" type="number" min="1" max="10000" step="0.01" class="input-field" placeholder="e.g. 10.00">
+            <div id="spFeePreview" class="fee-preview small muted"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Steps Required</label>
+            <input id="spSteps" type="number" min="100" max="1000000" step="100" class="input-field" placeholder="e.g. 10000">
+            <div id="spTimerPreview" class="fee-preview small muted"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">If challenge fails…</label>
+            <div class="radio-group">
+              <label class="radio-option"><input type="radio" name="spFailure" value="refund" checked><span>Refund me</span></label>
+              <label class="radio-option"><input type="radio" name="spFailure" value="charity"><span>Donate to charity</span></label>
+            </div>
+          </div>
+          <div id="spCharityGroup" class="form-group" hidden>
+            <label class="form-label">Choose Charity</label>
+            <select id="spCharity" class="type-select"><option value="">Loading…</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Message (optional)</label>
+            <input id="spMessage" class="input-field" placeholder="Go get 'em!" maxlength="140">
+          </div>
+          <button id="btnCreateChallenge" class="btn-primary btn-full btn-xl" disabled>Create Challenge</button>
+          <p class="small muted" style="margin-top:8px;text-align:center">Processing fee charged at checkout. Non-refundable.</p>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div id="stabSpLeaderboard" class="tab-content" hidden>
+        <div class="pill-bar" id="spLbCat" style="padding:8px 0;flex-wrap:wrap;gap:6px">
+          <button class="pill active" data-val="earnings">Earnings</button>
+          <button class="pill" data-val="steps">Steps</button>
+          <button class="pill" data-val="challenges">Challenges</button>
+          <button class="pill" data-val="completion_rate">% Rate</button>
+          <button class="pill" data-val="charity">Charity</button>
+          <button class="pill" data-val="top_sponsors">Sponsors</button>
+        </div>
+        <div id="spLbList" class="lb-list"></div>
+      </div>
+
+      <!-- Notifications -->
+      <div id="stabNotifications" class="tab-content" hidden>
+        <div id="notifList" class="notif-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /screenApp -->
+
+<div id="toastContainer" class="toast-container"></div>
+
+<div id="modalBackdrop" class="modal-backdrop" hidden>
+  <div id="modal" class="modal-box">
+    <div id="modalTitle" class="modal-title"></div>
+    <div id="modalBody" class="modal-body"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="./msal-browser.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
