@@ -683,6 +683,31 @@ async function route(request, url, env, db, kv) {
     return json({ ok: true, ts: Date.now() });
   }
 
+  // Beta access request – unauthenticated by design (the whole point is
+  // people who don't have an account yet). Rate-limited by IP since there's
+  // no userId to key off.
+  if (path === "/account-requests" && method === "POST") {
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const ok = await rateLimit(kv, `acct_req:${ip}`, 5, 3600);
+    if (!ok) return err("Too many requests – try again later", 429);
+
+    const body = await request.json();
+    const name = (body.name || "").trim();
+    const email = (body.email || "").trim();
+    const message = (body.message || "").trim();
+
+    if (!name || name.length > 100) return err("Valid name required");
+    if (!email || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return err("Valid email required");
+    if (message.length > 500) return err("Message too long");
+
+    await db.prepare(
+      `INSERT INTO account_requests(id,name,email,message,created_at) VALUES(?,?,?,?,?)`
+    ).bind(uuid(), name, email, message || null, nowSec()).run();
+
+    return json({ ok: true }, 201);
+  }
+
   // Auth: exchange MSAL token for profile
   if (path === "/auth/me" && method === "GET") {
     const { userId, email, name } = await authenticate(request, env, kv);
@@ -1489,6 +1514,18 @@ async function route(request, url, env, db, kv) {
 
     const processed = await processExpiredChallenges(db);
     return json({ processed, ts: nowSec() });
+  }
+
+  // ── Admin – review beta access requests ───────────────────────
+
+  if (path === "/admin/account-requests" && method === "GET") {
+    const secret = request.headers.get("X-Admin-Secret");
+    if (!secret || secret !== env.ADMIN_SECRET) return err("Forbidden", 403);
+
+    const rows = await db.prepare(
+      `SELECT * FROM account_requests ORDER BY created_at DESC LIMIT 200`
+    ).all();
+    return json(rows.results);
   }
 
   return err("Not found", 404);
