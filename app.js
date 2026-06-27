@@ -586,6 +586,39 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 });
 
+// ── Beta access request ──────────────────────────────────────────
+$('btnRequestAccess')?.addEventListener('click', () => {
+  showModal('Request Access', `
+    <p class="small muted" style="margin-bottom:10px">WayTrace is invite-only right now. Tell us a bit about yourself and we'll be in touch.</p>
+    <input id="reqName" class="input-field" placeholder="Your name" style="width:100%;margin-bottom:8px">
+    <input id="reqEmail" type="email" class="input-field" placeholder="Email address" style="width:100%;margin-bottom:8px">
+    <textarea id="reqMessage" class="input-field" placeholder="Why are you interested? (optional)" style="width:100%;min-height:70px;resize:vertical"></textarea>
+  `, [
+    { label: 'Send Request', cls: 'btn-primary btn-sm', cb: submitAccountRequest },
+    { label: 'Cancel', cls: 'btn-secondary btn-sm' },
+  ]);
+});
+async function submitAccountRequest() {
+  const name = $('reqName')?.value?.trim();
+  const email = $('reqEmail')?.value?.trim();
+  const message = $('reqMessage')?.value?.trim();
+  if (!name) { toast('Name is required', 'error'); return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('A valid email is required', 'error'); return; }
+  try {
+    // Deliberately not using api() – there's no token yet, this must work signed-out.
+    const res = await fetch(`${CONFIG.API_BASE}/account-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    toast("Request received – we'll be in touch!", 'success', 5000);
+  } catch (e) {
+    toast(e.message || 'Failed to send request', 'error');
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
