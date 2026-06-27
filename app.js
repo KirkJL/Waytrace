@@ -575,7 +575,7 @@ async function handleSignIn() {
   try {
     if (CONFIG.DEV_MODE) { const me=await api('/auth/me'); state.userData=me; showApp(); initMap(); showView('track'); recoverDraft(); syncOfflineQueue(); return; }
     if (!msalApp) throw new Error('MSAL failed to load');
-    const result=await msalApp.loginPopup({scopes:CONFIG.SCOPES}); currentAccount=result.account;
+    const result=await msalApp.loginPopup({scopes:CONFIG.SCOPES, prompt:'select_account'}); currentAccount=result.account;
     const me=await api('/auth/me'); state.userData=me; showApp(); initMap(); showView('track'); recoverDraft(); syncOfflineQueue();
   } catch(e) { errEl.textContent=e.message||'Sign in failed'; errEl.hidden=false; }
   finally { $('btnSignIn').disabled=false; }
